@@ -35,12 +35,17 @@ public class GameController {
             GameEngine.HitResult result = engine.checkHitWithDistance(x, y, System.nanoTime());
 
             if (result != null) {
-                HitRating rating = result.distance() <= GREAT_RADIUS
-                        ? HitRating.GREAT
-                        : HitRating.GOOD;
-                // Pasamos el rating al ScoreSystem para puntaje diferenciado
-                engine.getScoreSystem().registerHit(rating);
-                view.spawnHitEffect(x, y, rating);
+                if (result.trap()) {
+                    // Clickeó una trampa → game over inmediato
+                    view.spawnTrapEffect(x, y);
+                    engine.forceGameOver();
+                } else {
+                    HitRating rating = result.distance() <= GREAT_RADIUS
+                            ? HitRating.GREAT
+                            : HitRating.GOOD;
+                    engine.getScoreSystem().registerHit(rating);
+                    view.spawnHitEffect(x, y, rating);
+                }
             }
 
             view.updateScore(engine.getScoreSystem());

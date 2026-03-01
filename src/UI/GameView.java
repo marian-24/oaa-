@@ -229,7 +229,10 @@ public class GameView extends Pane {
     }
 
     private void drawNotes(List<Note> notes) {
-        for (Note note : notes) drawNote(note.getX(), note.getY());
+        for (Note note : notes) {
+            if (note.isTrap()) drawTrapNote(note.getX(), note.getY());
+            else               drawNote(note.getX(), note.getY());
+        }
     }
 
     private void drawNote(double x, double y) {
@@ -350,13 +353,61 @@ public class GameView extends Pane {
         }
     }
 
+    private void drawTrapNote(double x, double y) {
+        double r = NOTE_RADIUS;
+
+        // Halo rojo exterior
+        RadialGradient halo = new RadialGradient(
+                0, 0, x, y, r * 1.8, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#FF0000", 0.3)),
+                new Stop(1.0, Color.web("#FF0000", 0.0)));
+        gc.setFill(halo);
+        double hs = r * 1.8 * 2;
+        gc.fillOval(x - r * 1.8, y - r * 1.8, hs, hs);
+
+        // Rombo: 4 puntos (arriba, derecha, abajo, izquierda)
+        double[] px = { x,     x + r, x,     x - r };
+        double[] py = { y - r, y,     y + r, y     };
+
+        // Relleno degradado rojo
+        RadialGradient fill = new RadialGradient(
+                0, 0, x, y - r * 0.3, r,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#FF4444", 0.95)),
+                new Stop(1.0, Color.web("#880000", 0.9)));
+        gc.setFill(fill);
+        gc.fillPolygon(px, py, 4);
+
+        // Borde rojo brillante
+        gc.setStroke(Color.web("#FF2222"));
+        gc.setLineWidth(2.5);
+        gc.strokePolygon(px, py, 4);
+
+        // Punto central blanco
+        gc.setFill(Color.web("#FFAAAA", 0.9));
+        gc.fillOval(x - 3, y - 3, 6, 6);
+    }
+
+    /** Efecto visual al clickear una trampa: partículas rojas + label de penalización */
+    public void spawnTrapEffect(double x, double y) {
+        Random rand = new Random();
+        for (int i = 0; i < 18; i++) {
+            double angle = rand.nextDouble() * Math.PI * 2;
+            double speed = 2.0 + rand.nextDouble() * 4.0;
+            double life  = 0.5 + rand.nextDouble() * 0.4;
+            particles.add(new Particle(x, y,
+                    Math.cos(angle) * speed, Math.sin(angle) * speed,
+                    life, Color.web("#FF2222")));
+        }
+        feedbackLabels.add(new FeedbackLabel(x, y - NOTE_RADIUS - 10, "TRAP!", HitRating.MISS));
+        playMissSound();
+    }
+
+    // ------------------------------------------------------------------ //
     /** Retrocompatibilidad */
     public void spawnHitParticles(double x, double y) {
         spawnHitEffect(x, y, HitRating.GREAT);
     }
-
-    // ------------------------------------------------------------------ //
-    //  Sonido (generado por síntesis, sin archivos externos)
     // ------------------------------------------------------------------ //
 
     private void playHitSound(HitRating rating) {

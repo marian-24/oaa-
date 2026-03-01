@@ -62,8 +62,9 @@ public class GameEngine {
 
             double x = 100 + Math.random() * 600;
             double y = 100 + Math.random() * 300;
+            boolean trap = Math.random() < 0.10;  // 20% de chances de trampa
 
-            Note note = new Note(x, y, gameTime, difficulty.getNoteDuration());
+            Note note = new Note(x, y, gameTime, difficulty.getNoteDuration(), trap);
             note.setState(NoteState.ACTIVE);
             activeNotes.add(note);
 
@@ -80,8 +81,12 @@ public class GameEngine {
         if (current.isExpired(gameTime)) {
             current.setState(NoteState.MISSED);
             activeNotes.poll();
-            scoreSystem.registerMiss();
-            running = false;
+
+            if (!current.isTrap()) {
+                // Solo penalizar si era una nota normal, no una trampa
+                scoreSystem.registerMiss();
+                running = false;
+            }
         }
     }
 
@@ -108,16 +113,15 @@ public class GameEngine {
 
                 note.setState(NoteState.HIT);
                 iterator.remove();
-                // El controller llama a scoreSystem.registerHit(rating) con el rating correcto
-                return new HitResult(distance);
+                return new HitResult(distance, note.isTrap());
             }
         }
 
         return null;
     }
 
-    /** Resultado de un hit con la distancia al centro de la nota */
-    public record HitResult(double distance) {}
+    /** Resultado de un hit con la distancia al centro y si era trampa */
+    public record HitResult(double distance, boolean trap) {}
 
     // ------------------------------------------------------------------ //
 
@@ -126,4 +130,7 @@ public class GameEngine {
     public DifficultyManager getDifficulty() { return difficulty; }
     public boolean isRunning()           { return running; }
     public boolean isGameOver()          { return !running; }
+
+    /** Fuerza el fin del juego inmediatamente (usado al clickear una trampa) */
+    public void forceGameOver()          { running = false; }
 }

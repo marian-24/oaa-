@@ -9,7 +9,16 @@ import javax.sound.sampled.*;
 import java.io.File;
 import java.util.*;
 
-
+/**
+ * Engine para el modo canción.
+ *
+ * Diferencias con GameEngine (modo arcade):
+ *  - Las notas aparecen en los tiempos de beat detectados, no aleatoriamente
+ *  - El juego termina cuando se acaban los beats (no por un miss)
+ *  - Un miss no termina el juego, solo rompe el combo y resta vida
+ *  - Reproduce el audio en paralelo sincronizado con el gameTime
+ *  - No hay DifficultyManager (la canción define el ritmo)
+ */
 public class SongEngine {
 
     // Duración visible de cada nota en nanosegundos
@@ -17,10 +26,6 @@ public class SongEngine {
 
     // Radio de hit
     private static final double HIT_RADIUS = 30;
-
-    // Vidas
-    private static final int MAX_LIVES = 3;
-    private int lives = MAX_LIVES;
 
     // ------------------------------------------------------------------ //
 
@@ -31,6 +36,10 @@ public class SongEngine {
     private long startTime;
     private boolean running = false;
     private boolean finished = false;
+
+    // Vidas
+    private static final int MAX_LIVES = 3;
+    private int lives = MAX_LIVES;
 
     private int nextBeatIndex = 0;              // cuál beat spawneamos a continuación
     private Clip audioClip;                     // reproducción del audio
@@ -72,14 +81,14 @@ public class SongEngine {
     // ------------------------------------------------------------------ //
 
     private void spawnBeats(long gameTime) {
-        // Spawneamos todas las notas cuyo beat ya llegó
         while (nextBeatIndex < beatTimesNs.size()
                 && beatTimesNs.get(nextBeatIndex) <= gameTime) {
 
             double x = 80 + Math.random() * 640;
             double y = 80 + Math.random() * 400;
+            boolean trap = Math.random() < 0.20;  // 20% de chances de trampa
 
-            Note note = new Note(x, y, gameTime, NOTE_DURATION);
+            Note note = new Note(x, y, gameTime, NOTE_DURATION, trap);
             note.setState(NoteState.ACTIVE);
             activeNotes.add(note);
             nextBeatIndex++;
@@ -93,14 +102,16 @@ public class SongEngine {
             if (note.isExpired(gameTime)) {
                 note.setState(NoteState.MISSED);
                 it.remove();
-                scoreSystem.registerMiss();
 
-                lives--;
-                if (lives <= 0) {
-                    lives = 0;
-                    running = false;
-                    finished = false; // terminó por game over, no por completar la canción
-                    if (audioClip != null) audioClip.stop();
+                if (!note.isTrap()) {
+                    // Solo penalizar si era una nota normal, no una trampa
+                    scoreSystem.registerMiss();
+                    lives--;
+                    if (lives <= 0) {
+                        lives = 0;
+                        running = false;
+                        if (audioClip != null) audioClip.stop();
+                    }
                 }
             }
         }
@@ -132,8 +143,7 @@ public class SongEngine {
 
                 note.setState(NoteState.HIT);
                 it.remove();
-                // El rating lo decide el controller según la distancia
-                return new HitResult(distance, note.getX(), note.getY());
+                return new HitResult(distance, note.getX(), note.getY(), note.isTrap());
             }
         }
         return null;
@@ -141,6 +151,17 @@ public class SongEngine {
 
     public void registerHit(HitRating rating) {
         scoreSystem.registerHit(rating);
+    }
+
+    /** Penaliza al jugador por clickear una trampa: pierde una vida */
+    public void registerTrapHit() {
+        scoreSystem.registerMiss();
+        lives--;
+        if (lives <= 0) {
+            lives = 0;
+            running = false;
+            if (audioClip != null) audioClip.stop();
+        }
     }
 
     // ------------------------------------------------------------------ //
@@ -159,7 +180,9 @@ public class SongEngine {
         }
     }
 
+    // ------------------------------------------------------------------ //
     //  Getters
+    // ------------------------------------------------------------------ //
 
     public List<Note> getActiveNotes()  { return new ArrayList<>(activeNotes); }
     public ScoreSystem getScoreSystem() { return scoreSystem; }
@@ -169,7 +192,9 @@ public class SongEngine {
     public int getLives()               { return lives; }
     public int getMaxLives()            { return MAX_LIVES; }
 
+    // ------------------------------------------------------------------ //
     //  Records de resultado
+    // ------------------------------------------------------------------ //
 
-    public record HitResult(double distance, double noteX, double noteY) {}
+    public record HitResult(double distance, double noteX, double noteY, boolean trap) {}
 }

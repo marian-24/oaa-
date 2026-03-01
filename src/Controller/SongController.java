@@ -32,11 +32,17 @@ public class SongController {
             SongEngine.HitResult result = engine.checkHitWithDistance(x, y);
 
             if (result != null) {
-                HitRating rating = result.distance() <= GREAT_RADIUS
-                        ? HitRating.GREAT
-                        : HitRating.GOOD;
-                engine.registerHit(rating);
-                view.spawnHitEffect(x, y, rating);
+                if (result.trap()) {
+                    // Clickeó una trampa → pierde una vida
+                    view.spawnTrapEffect(x, y);
+                    engine.registerTrapHit();
+                } else {
+                    HitRating rating = result.distance() <= GREAT_RADIUS
+                            ? HitRating.GREAT
+                            : HitRating.GOOD;
+                    engine.registerHit(rating);
+                    view.spawnHitEffect(x, y, rating);
+                }
             }
 
             view.updateScore(engine.getScoreSystem());
@@ -50,7 +56,7 @@ public class SongController {
                 engine.update(now);
                 view.renderFrame(engine.getActiveNotes());
                 view.updateScore(engine.getScoreSystem());
-                view.setLives(engine.getLives());
+                view.setLives(engine.getLives());   // sincronizar corazones cada frame
 
                 if (engine.isGameOver()) {
                     stop();
