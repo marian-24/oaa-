@@ -2,5 +2,6 @@ package UI;
 
 public enum MenuTheme {
     SPACE,
-    MATRIX
+    MATRIX,
+    SAKURA
 }

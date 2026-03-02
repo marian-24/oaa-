@@ -49,6 +49,17 @@ public class GameView extends Pane {
     private final double[] colOpacity  = new double[COL_COUNT];
     private int matrixFrame = 0;
 
+    // --- Sakura (tema SAKURA) ---
+    private static final int GPETAL_COUNT = 45;
+    private final double[] gpetalX       = new double[GPETAL_COUNT];
+    private final double[] gpetalY       = new double[GPETAL_COUNT];
+    private final double[] gpetalSize    = new double[GPETAL_COUNT];
+    private final double[] gpetalSpeedY  = new double[GPETAL_COUNT];
+    private final double[] gpetalSpeedX  = new double[GPETAL_COUNT];
+    private final double[] gpetalAngle   = new double[GPETAL_COUNT];
+    private final double[] gpetalSpin    = new double[GPETAL_COUNT];
+    private final double[] gpetalOpacity = new double[GPETAL_COUNT];
+
     // --- Partículas ---
     private final List<Particle> particles = new ArrayList<>();
 
@@ -83,6 +94,7 @@ public class GameView extends Pane {
 
         initStars();
         initMatrixData();
+        initSakuraPetals();
         setupMouseHandling();
     }
 
@@ -141,6 +153,14 @@ public class GameView extends Pane {
     // --- Flash de daño (pantalla roja) ---
     private double damageFlashAlpha = 0;
 
+    // --- Efectos de fondo reactivos ---
+    private final List<RippleEffect> ripples = new ArrayList<>();
+    private double vignetteCombo   = 0;   // 0..1 brillo del borde por combo
+    private double vignetteDamage  = 0;   // 0..1 rojo de borde por daño
+    private double bgPulse         = 0;   // 0..1 pulso central en milestone
+    private String bgPulseColor    = "#7B2FFF";
+    private int    currentCombo    = 0;
+
     public void setLives(int lives) { /* reemplazado por HP drain */ }
 
     /** Dispara el efecto visual de milestone de combo */
@@ -153,6 +173,8 @@ public class GameView extends Pane {
             case 50  -> "#FF00FF";
             default  -> "#FF0000";
         };
+        bgPulseColor = comboFlashColor;
+        bgPulse      = 1.0;
         spawnMilestoneParticles(milestone);
         playMilestoneSound(milestone);
     }
@@ -160,17 +182,37 @@ public class GameView extends Pane {
     /** Dispara el flash rojo de daño */
     public void triggerDamageFlash() {
         damageFlashAlpha = 0.35;
+        vignetteDamage   = 1.0;
+    }
+
+    /** Registra un hit para efectos de fondo (llamar con la pos del click) */
+    public void triggerHitRipple(double x, double y, HitRating rating) {
+        String color = rating == HitRating.GREAT
+                ? (theme == MenuTheme.MATRIX ? "#00FF41" : theme == MenuTheme.SAKURA ? "#FF85A1" : "#7B2FFF")
+                : (theme == MenuTheme.MATRIX ? "#AAFFAA" : theme == MenuTheme.SAKURA ? "#FFB7C5" : "#00BFFF");
+        ripples.add(new RippleEffect(x, y, color));
+    }
+
+    /** Actualiza el combo actual para la vignette reactiva */
+    public void setCurrentCombo(int combo) {
+        this.currentCombo = combo;
+        // Objetivo de brillo según combo: sube gradualmente
+        double target = Math.min(1.0, combo / 50.0);
+        vignetteCombo = vignetteCombo * 0.9 + target * 0.1; // suavizado
     }
 
     public void renderFrame(List<Note> activeNotes, double hp, long gameTime) {
         this.currentHp       = hp;
         this.currentGameTime = gameTime;
         drawBackground();
+        drawBgPulse();
         drawStars();
+        updateAndDrawRipples();
         updateAndDrawParticles();
         drawNotes(activeNotes);
         updateAndDrawFeedbackLabels();
         drawHUD();
+        drawVignette();
         drawDamageFlash();
         drawComboFlash();
     }
@@ -209,8 +251,10 @@ public class GameView extends Pane {
 
     private void drawBackground() {
         if (theme == MenuTheme.MATRIX) {
-            // Fondo con transparencia para efecto de estela
             gc.setFill(Color.web("#000000", 0.2));
+            gc.fillRect(0, 0, WIDTH, HEIGHT);
+        } else if (theme == MenuTheme.SAKURA) {
+            gc.setFill(Color.web("#1a0010"));
             gc.fillRect(0, 0, WIDTH, HEIGHT);
         } else {
             gc.setFill(Color.web("#000010"));
@@ -221,6 +265,8 @@ public class GameView extends Pane {
     private void drawStars() {
         if (theme == MenuTheme.MATRIX) {
             drawMatrix();
+        } else if (theme == MenuTheme.SAKURA) {
+            drawSakuraPetals();
         } else {
             drawSpaceStars();
         }
@@ -351,6 +397,62 @@ public class GameView extends Pane {
         }
         gc.setGlobalAlpha(1.0);
         gc.setTextAlign(TextAlignment.LEFT); // resetear para el HUD
+    }
+
+    /** Pulso central de fondo en milestone — gradiente que aparece y desaparece */
+    private void drawBgPulse() {
+        if (bgPulse <= 0) return;
+        RadialGradient pulse = new RadialGradient(
+                0, 0, WIDTH / 2, HEIGHT / 2, WIDTH * 0.7, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web(bgPulseColor, bgPulse * 0.18)),
+                new Stop(1.0, Color.web(bgPulseColor, 0.0)));
+        gc.setFill(pulse);
+        gc.fillRect(0, 0, WIDTH, HEIGHT);
+        bgPulse = Math.max(0, bgPulse - 0.012);
+    }
+
+    /** Ondas de ripple que se expanden desde cada hit */
+    private void updateAndDrawRipples() {
+        Iterator<RippleEffect> it = ripples.iterator();
+        while (it.hasNext()) {
+            RippleEffect r = it.next();
+            r.update();
+            if (r.isDead()) { it.remove(); continue; }
+            gc.setGlobalAlpha(r.alpha());
+            gc.setStroke(Color.web(r.color, r.alpha() * 0.6));
+            gc.setLineWidth(2.5 * (1 - r.progress()));
+            double d = r.radius() * 2;
+            gc.strokeOval(r.x - r.radius(), r.y - r.radius(), d, d);
+        }
+        gc.setGlobalAlpha(1.0);
+        gc.setLineWidth(1.0);
+    }
+
+    /** Vignette reactiva: brilla con el color del tema según combo, rojo en daño */
+    private void drawVignette() {
+        // Decay
+        vignetteCombo  = Math.max(0, vignetteCombo  - 0.005);
+        vignetteDamage = Math.max(0, vignetteDamage - 0.03);
+
+        // Capa de combo (azul/verde según tema)
+        if (vignetteCombo > 0.01) {
+            String vColor = theme == MenuTheme.MATRIX ? "#00FF41" : theme == MenuTheme.SAKURA ? "#FF85A1" : "#7B2FFF";
+            drawVignetteLayer(vColor, vignetteCombo * 0.55);
+        }
+        // Capa de daño (rojo, tiene prioridad visual)
+        if (vignetteDamage > 0.01) {
+            drawVignetteLayer("#FF0000", vignetteDamage * 0.65);
+        }
+    }
+
+    private void drawVignetteLayer(String hexColor, double maxAlpha) {
+        double r = Math.max(WIDTH, HEIGHT) * 0.75;
+        RadialGradient vg = new RadialGradient(
+                0, 0, WIDTH / 2, HEIGHT / 2, r, false, CycleMethod.NO_CYCLE,
+                new Stop(0.55, Color.web(hexColor, 0.0)),
+                new Stop(1.0,  Color.web(hexColor, maxAlpha)));
+        gc.setFill(vg);
+        gc.fillRect(0, 0, WIDTH, HEIGHT);
     }
 
     private void drawDamageFlash() {
@@ -690,5 +792,73 @@ public class GameView extends Pane {
                 case MISS  -> Color.web("#FF4444");  // rojo
             };
         }
+    }
+    // ------------------------------------------------------------------ //
+    //  Tema SAKURA — pétalos en juego
+    // ------------------------------------------------------------------ //
+
+    private void initSakuraPetals() {
+        Random rand = new Random();
+        for (int i = 0; i < GPETAL_COUNT; i++) {
+            gpetalX[i]       = rand.nextDouble() * WIDTH;
+            gpetalY[i]       = rand.nextDouble() * HEIGHT;
+            gpetalSize[i]    = 4 + rand.nextDouble() * 8;
+            gpetalSpeedY[i]  = 0.5 + rand.nextDouble() * 1.0;
+            gpetalSpeedX[i]  = -0.3 + rand.nextDouble() * 0.6;
+            gpetalAngle[i]   = rand.nextDouble() * Math.PI * 2;
+            gpetalSpin[i]    = (rand.nextBoolean() ? 1 : -1) * (0.008 + rand.nextDouble() * 0.025);
+            gpetalOpacity[i] = 0.3 + rand.nextDouble() * 0.5;
+        }
+    }
+
+    private void drawSakuraPetals() {
+        for (int i = 0; i < GPETAL_COUNT; i++) {
+            gc.save();
+            gc.setGlobalAlpha(gpetalOpacity[i]);
+            gc.translate(gpetalX[i], gpetalY[i]);
+            gc.rotate(Math.toDegrees(gpetalAngle[i]));
+            double s = gpetalSize[i];
+            // 5 pétalos elípticos rotados
+            for (int p = 0; p < 5; p++) {
+                gc.save();
+                gc.rotate(p * 72.0);
+                gc.setFill(Color.web("#FFB7C5", 0.8));
+                gc.fillOval(-s * 0.3, -s, s * 0.6, s);
+                gc.setFill(Color.web("#FFD6E0", 0.35));
+                gc.fillOval(-s * 0.15, -s * 0.85, s * 0.3, s * 0.55);
+                gc.restore();
+            }
+            gc.restore();
+
+            gpetalY[i]     += gpetalSpeedY[i];
+            gpetalX[i]     += gpetalSpeedX[i] + Math.sin(gpetalAngle[i] * 2) * 0.25;
+            gpetalAngle[i] += gpetalSpin[i];
+            if (gpetalY[i] > HEIGHT + 20) {
+                gpetalY[i] = -20;
+                gpetalX[i] = new Random().nextDouble() * WIDTH;
+            }
+        }
+        gc.setGlobalAlpha(1.0);
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Clase interna: RippleEffect
+    // ------------------------------------------------------------------ //
+
+    private static class RippleEffect {
+        final double x, y;
+        final String color;
+        private double life = 1.0;
+        private static final double MAX_RADIUS = 120;
+
+        RippleEffect(double x, double y, String color) {
+            this.x = x; this.y = y; this.color = color;
+        }
+
+        void   update()    { life -= 0.035; }
+        double alpha()     { return Math.max(0, life); }
+        double progress()  { return 1.0 - life; }
+        double radius()    { return progress() * MAX_RADIUS; }
+        boolean isDead()   { return life <= 0; }
     }
 }

@@ -50,14 +50,22 @@ public class SongController {
 
     private void setupGameLoop() {
         gameLoop = new AnimationTimer() {
+            private int lastMisses = 0;
+
             @Override
             public void handle(long now) {
-                double hpBefore = engine.getHpSystem().getHp();
                 engine.update(now);
-                double hpAfter  = engine.getHpSystem().getHp();
-                if (hpAfter < hpBefore) view.triggerDamageFlash();
+
+                // Flash solo en misses reales, no por drain continuo
+                int currentMisses = engine.getScoreSystem().getMisses();
+                if (currentMisses > lastMisses) {
+                    view.triggerDamageFlash();
+                    lastMisses = currentMisses;
+                }
+
                 view.renderFrame(engine.getActiveNotes(), engine.getHpSystem().getHp(), engine.getGameTime(now));
                 view.updateScore(engine.getScoreSystem());
+                view.setCurrentCombo(engine.getScoreSystem().getCombo());
 
                 if (engine.isGameOver()) {
                     stop();

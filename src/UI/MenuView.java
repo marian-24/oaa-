@@ -64,6 +64,19 @@ public class MenuView extends StackPane {
     private int matrixFrame = 0;        // para cambiar chars cada N frames
 
     // ------------------------------------------------------------------ //
+    //  Datos tema SAKURA
+    // ------------------------------------------------------------------ //
+    private static final int PETAL_COUNT = 60;
+    private final double[] petalX      = new double[PETAL_COUNT];
+    private final double[] petalY      = new double[PETAL_COUNT];
+    private final double[] petalSize   = new double[PETAL_COUNT];
+    private final double[] petalSpeedY = new double[PETAL_COUNT];
+    private final double[] petalSpeedX = new double[PETAL_COUNT];
+    private final double[] petalAngle  = new double[PETAL_COUNT];
+    private final double[] petalSpin   = new double[PETAL_COUNT];
+    private final double[] petalOpacity= new double[PETAL_COUNT];
+
+    // ------------------------------------------------------------------ //
     //  Construcción
     // ------------------------------------------------------------------ //
 
@@ -76,6 +89,7 @@ public class MenuView extends StackPane {
 
         initSpaceData();
         initMatrixData();
+        initSakuraData();
         startAnimation();
 
         // --- Contenido ---
@@ -130,19 +144,24 @@ public class MenuView extends StackPane {
 
         Button spaceBtn  = themeButton("🌌 Space",  MenuTheme.SPACE);
         Button matrixBtn = themeButton("💻 Matrix", MenuTheme.MATRIX);
+        Button sakuraBtn = themeButton("🌸 Sakura", MenuTheme.SAKURA);
 
-        highlightThemeButtons(spaceBtn, matrixBtn);
+        highlightThemeButtons(spaceBtn, matrixBtn, sakuraBtn);
 
         spaceBtn.setOnAction(e -> {
             switchTheme(MenuTheme.SPACE);
-            highlightThemeButtons(spaceBtn, matrixBtn);
+            highlightThemeButtons(spaceBtn, matrixBtn, sakuraBtn);
         });
         matrixBtn.setOnAction(e -> {
             switchTheme(MenuTheme.MATRIX);
-            highlightThemeButtons(spaceBtn, matrixBtn);
+            highlightThemeButtons(spaceBtn, matrixBtn, sakuraBtn);
+        });
+        sakuraBtn.setOnAction(e -> {
+            switchTheme(MenuTheme.SAKURA);
+            highlightThemeButtons(spaceBtn, matrixBtn, sakuraBtn);
         });
 
-        HBox row = new HBox(10, label, spaceBtn, matrixBtn);
+        HBox row = new HBox(10, label, spaceBtn, matrixBtn, sakuraBtn);
         row.setAlignment(Pos.CENTER);
         return row;
     }
@@ -153,7 +172,7 @@ public class MenuView extends StackPane {
         return btn;
     }
 
-    private void highlightThemeButtons(Button spaceBtn, Button matrixBtn) {
+    private void highlightThemeButtons(Button spaceBtn, Button matrixBtn, Button sakuraBtn) {
         String active   = "-fx-background-color: #333355; -fx-text-fill: white;" +
                 "-fx-background-radius: 15; -fx-padding: 6 16 6 16;" +
                 "-fx-border-color: #A78BFA; -fx-border-radius: 15; -fx-cursor: hand;";
@@ -163,6 +182,7 @@ public class MenuView extends StackPane {
 
         spaceBtn.setStyle(currentTheme == MenuTheme.SPACE   ? active : inactive);
         matrixBtn.setStyle(currentTheme == MenuTheme.MATRIX ? active : inactive);
+        sakuraBtn.setStyle(currentTheme == MenuTheme.SAKURA ? active : inactive);
     }
 
     private void switchTheme(MenuTheme theme) {
@@ -182,7 +202,9 @@ public class MenuView extends StackPane {
 
         Glow glow = new Glow(0.8);
         DropShadow shadow = new DropShadow(20,
-                currentTheme == MenuTheme.MATRIX ? Color.LIMEGREEN : Color.DODGERBLUE);
+                currentTheme == MenuTheme.MATRIX ? Color.LIMEGREEN
+                        : currentTheme == MenuTheme.SAKURA  ? Color.web("#FF85A1")
+                        : Color.DODGERBLUE);
         shadow.setInput(glow);
         title.setEffect(shadow);
         return title;
@@ -199,9 +221,12 @@ public class MenuView extends StackPane {
                 if (currentTheme == MenuTheme.SPACE) {
                     drawSpaceBackground();
                     drawStars();
-                } else {
+                } else if (currentTheme == MenuTheme.MATRIX) {
                     drawMatrixBackground();
                     drawMatrix();
+                } else {
+                    drawSakuraBackground();
+                    drawPetals();
                 }
             }
         };
@@ -307,6 +332,77 @@ public class MenuView extends StackPane {
             }
         }
         gc.setGlobalAlpha(1.0);
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Tema SAKURA
+    // ------------------------------------------------------------------ //
+
+    private void initSakuraData() {
+        Random rand = new Random();
+        for (int i = 0; i < PETAL_COUNT; i++) {
+            petalX[i]       = rand.nextDouble() * W;
+            petalY[i]       = rand.nextDouble() * H;
+            petalSize[i]    = 5 + rand.nextDouble() * 10;
+            petalSpeedY[i]  = 0.6 + rand.nextDouble() * 1.2;
+            petalSpeedX[i]  = -0.4 + rand.nextDouble() * 0.8;
+            petalAngle[i]   = rand.nextDouble() * Math.PI * 2;
+            petalSpin[i]    = (rand.nextBoolean() ? 1 : -1) * (0.01 + rand.nextDouble() * 0.03);
+            petalOpacity[i] = 0.4 + rand.nextDouble() * 0.6;
+        }
+    }
+
+    private void drawSakuraBackground() {
+        // Degradado vertical rosa oscuro → magenta oscuro → rosa oscuro
+        LinearGradient bg = new LinearGradient(
+                0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#1a0010")),
+                new Stop(0.4, Color.web("#2d0020")),
+                new Stop(0.7, Color.web("#200018")),
+                new Stop(1.0, Color.web("#150010"))
+        );
+        gc.setFill(bg);
+        gc.fillRect(0, 0, W, H);
+    }
+
+    private void drawPetals() {
+        for (int i = 0; i < PETAL_COUNT; i++) {
+            gc.save();
+            gc.setGlobalAlpha(petalOpacity[i]);
+            gc.translate(petalX[i], petalY[i]);
+            gc.rotate(Math.toDegrees(petalAngle[i]));
+
+            drawPetalShape(petalSize[i]);
+
+            gc.restore();
+
+            // Mover pétalo
+            petalY[i]     += petalSpeedY[i];
+            petalX[i]     += petalSpeedX[i] + Math.sin(petalAngle[i] * 2) * 0.3;
+            petalAngle[i] += petalSpin[i];
+
+            // Resetear si sale de pantalla
+            if (petalY[i] > H + 20) {
+                petalY[i] = -20;
+                petalX[i] = new Random().nextDouble() * W;
+            }
+        }
+        gc.setGlobalAlpha(1.0);
+    }
+
+    private void drawPetalShape(double size) {
+        // Forma de pétalo: 5 elipses rotadas alrededor del centro
+        for (int p = 0; p < 5; p++) {
+            gc.save();
+            gc.rotate(p * 72.0);
+            // Degradado rosa
+            gc.setFill(Color.web("#FFB7C5", 0.85));
+            gc.fillOval(-size * 0.3, -size, size * 0.6, size);
+            // Borde más claro
+            gc.setFill(Color.web("#FFD6E0", 0.4));
+            gc.fillOval(-size * 0.15, -size * 0.9, size * 0.3, size * 0.6);
+            gc.restore();
+        }
     }
 
     // ------------------------------------------------------------------ //

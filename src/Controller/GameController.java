@@ -63,12 +63,15 @@ public class GameController {
 
                 if (before.size() > after.size()) {
                     Note missed = before.get(0);
-                    view.spawnMissEffect(missed.getX(), missed.getY());
-                    view.triggerDamageFlash();
+                    if (!missed.isTrap()) {
+                        view.spawnMissEffect(missed.getX(), missed.getY());
+                        view.triggerDamageFlash();
+                    }
                 }
 
                 view.renderFrame(engine.getActiveNotes(), engine.getHpSystem().getHp(), engine.getGameTime(now));
                 view.updateScore(engine.getScoreSystem());
+                view.setCurrentCombo(engine.getScoreSystem().getCombo());
 
                 if (engine.isGameOver()) {
                     stop();
