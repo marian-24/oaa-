@@ -30,17 +30,18 @@ public class SongController {
 
     private void setupInputHandling() {
         view.setOnMouseClick((x, y) -> {
-            SongEngine.HitResult result = engine.checkHitWithDistance(x, y);
+            long gt = engine.getGameTime(System.nanoTime());
+            SongEngine.HitResult result = engine.checkHitWithDistance(x, y, gt);
 
             if (result != null) {
                 if (result.trap()) {
-                    view.spawnTrapEffect(x, y);
+                    view.spawnTrapEffect(result.noteX(), result.noteY());
                     engine.registerTrapHit();
                 } else {
                     HitRating rating = result.distance() <= GREAT_RADIUS
                             ? HitRating.GREAT : HitRating.GOOD;
                     engine.registerHit(rating);
-                    view.spawnHitEffect(x, y, rating);
+                    view.spawnHitEffect(result.noteX(), result.noteY(), rating);
                 }
             }
             view.updateScore(engine.getScoreSystem());

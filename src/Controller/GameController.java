@@ -2,6 +2,7 @@ package Controller;
 
 import Game.GameEngine;
 import Model.Note;
+import Model.NoteType;
 import Model.ScoreSystem;
 import UI.CanvasState;
 import UI.GameView;
@@ -37,7 +38,7 @@ public class GameController {
 
             if (result != null) {
                 if (result.trap()) {
-                    view.spawnTrapEffect(x, y);
+                    view.spawnTrapEffect(result.noteX(), result.noteY());
                     engine.getScoreSystem().registerMiss();
                     engine.getHpSystem().registerMiss();
                 } else {
@@ -45,7 +46,7 @@ public class GameController {
                             ? HitRating.GREAT : HitRating.GOOD;
                     engine.getScoreSystem().registerHit(rating);
                     engine.getHpSystem().registerHit(rating);
-                    view.spawnHitEffect(x, y, rating);
+                    view.spawnHitEffect(result.noteX(), result.noteY(), rating);
                 }
             }
             view.updateScore(engine.getScoreSystem());

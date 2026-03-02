@@ -240,8 +240,11 @@ public class GameView extends Pane {
         for (Note note : notes) {
             double progress = (double)(currentGameTime - note.getAppearTime()) / note.getDuration();
             progress = Math.max(0, Math.min(1, progress));
-            if (note.isTrap()) drawTrapNote(note.getX(), note.getY(), progress);
-            else               drawNote(note.getX(), note.getY(), progress);
+            double nx = note.getX(currentGameTime);
+            double ny = note.getY(currentGameTime);
+            if (note.isTrap())   drawTrapNote(nx, ny, progress);
+            else if (note.isMoving()) drawMovingNote(nx, ny, progress);
+            else                 drawNote(nx, ny, progress);
         }
     }
 
@@ -384,6 +387,46 @@ public class GameView extends Pane {
             particles.add(new Particle(x, y,
                     Math.cos(angle) * speed, Math.sin(angle) * speed, life, color));
         }
+    }
+
+    private void drawMovingNote(double x, double y, double progress) {
+        boolean isMatrix = theme == MenuTheme.MATRIX;
+        String approachColor = isMatrix ? "#FFFF00" : "#FFA500";
+        String borderColor   = isMatrix ? "#FFFF00" : "#FFA500";
+
+        // Approach circle naranja/amarillo
+        double approachScale = 3.0 - 2.0 * progress;
+        double ar = NOTE_RADIUS * approachScale;
+        gc.setStroke(Color.web(approachColor, 0.85 * (1.0 - progress * 0.5)));
+        gc.setLineWidth(2.0);
+        gc.strokeOval(x - ar, y - ar, ar * 2, ar * 2);
+
+        // Halo naranja
+        RadialGradient halo = new RadialGradient(
+                0, 0, x, y, NOTE_RADIUS * 1.8, false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#FF8800", 0.3)),
+                new Stop(1.0, Color.web("#FF8800", 0.0)));
+        gc.setFill(halo);
+        double hs = NOTE_RADIUS * 1.8 * 2;
+        gc.fillOval(x - NOTE_RADIUS * 1.8, y - NOTE_RADIUS * 1.8, hs, hs);
+
+        // Relleno
+        RadialGradient fill = new RadialGradient(
+                0, 0, x - NOTE_RADIUS * 0.3, y - NOTE_RADIUS * 0.3, NOTE_RADIUS,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.web("#FFB347", 0.9)),
+                new Stop(1.0, Color.web("#8B2500", 0.85)));
+        gc.setFill(fill);
+        gc.fillOval(x - NOTE_RADIUS, y - NOTE_RADIUS, NOTE_RADIUS * 2, NOTE_RADIUS * 2);
+
+        // Borde naranja
+        gc.setStroke(Color.web(borderColor));
+        gc.setLineWidth(2.5);
+        gc.strokeOval(x - NOTE_RADIUS, y - NOTE_RADIUS, NOTE_RADIUS * 2, NOTE_RADIUS * 2);
+
+        // Punto central
+        gc.setFill(Color.web("#FFE5CC", 0.9));
+        gc.fillOval(x - 4, y - 4, 8, 8);
     }
 
     private void drawTrapNote(double x, double y, double progress) {

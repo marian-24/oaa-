@@ -1,9 +1,6 @@
 package Game;
 
-import Model.HpSystem;
-import Model.Note;
-import Model.NoteState;
-import Model.ScoreSystem;
+import Model.*;
 
 import java.util.*;
 
@@ -66,9 +63,23 @@ public class GameEngine {
         if (gameTime - lastSpawnTime >= difficulty.getSpawnInterval()) {
             double x = 100 + Math.random() * 600;
             double y = 100 + Math.random() * 300;
-            boolean trap = Math.random() < 0.20;
 
-            Note note = new Note(x, y, gameTime, difficulty.getNoteDuration(), trap);
+            double roll = Math.random();
+            Note note;
+            if (roll < 0.10) {
+                // Nota MOVING — velocidad aleatoria entre 80 y 160 px/s
+                double speed = 80 + Math.random() * 80;
+                double angle = Math.random() * Math.PI * 2;
+                double vx = Math.cos(angle) * speed;
+                double vy = Math.sin(angle) * speed;
+                note = new Note(x, y, gameTime, difficulty.getNoteDuration(),
+                        NoteType.MOVING, vx, vy);
+            } else if (roll < 0.30) {
+                note = new Note(x, y, gameTime, difficulty.getNoteDuration(), NoteType.TRAP);
+            } else {
+                note = new Note(x, y, gameTime, difficulty.getNoteDuration(), NoteType.NORMAL);
+            }
+
             note.setState(NoteState.ACTIVE);
             activeNotes.add(note);
             lastSpawnTime = gameTime;
@@ -96,23 +107,25 @@ public class GameEngine {
     public HitResult checkHitWithDistance(double x, double y, long now) {
         if (!running) return null;
 
+        long gameTime = now - startTime;
+
         Iterator<Note> iterator = activeNotes.iterator();
         while (iterator.hasNext()) {
             Note note = iterator.next();
-            if (note.getState() == NoteState.ACTIVE && note.isInside(x, y, 30)) {
-                double dx = x - note.getX();
-                double dy = y - note.getY();
-                double distance = Math.sqrt(dx * dx + dy * dy);
+            if (note.getState() == NoteState.ACTIVE && note.isInside(x, y, 30, gameTime)) {
+                double cx = note.getX(gameTime);
+                double cy = note.getY(gameTime);
+                double distance = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
 
                 note.setState(NoteState.HIT);
                 iterator.remove();
-                return new HitResult(distance, note.isTrap());
+                return new HitResult(distance, note.isTrap(), cx, cy);
             }
         }
         return null;
     }
 
-    public record HitResult(double distance, boolean trap) {}
+    public record HitResult(double distance, boolean trap, double noteX, double noteY) {}
 
     // ------------------------------------------------------------------ //
 
