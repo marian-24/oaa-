@@ -1,5 +1,6 @@
 package Game;
 
+import Model.HpSystem;
 import Model.Note;
 import Model.NoteState;
 import Model.ScoreSystem;
@@ -12,6 +13,7 @@ public class GameEngine {
     private final Queue<Note> activeNotes;
     private final ScoreSystem scoreSystem;
     private final DifficultyManager difficulty;
+    private final HpSystem hpSystem;
 
     private long startTime;
     private boolean running;
@@ -22,6 +24,7 @@ public class GameEngine {
         this.activeNotes = new LinkedList<>();
         this.scoreSystem = new ScoreSystem();
         this.difficulty  = new DifficultyManager();
+        this.hpSystem    = new HpSystem();
         this.running     = false;
     }
 
@@ -31,15 +34,18 @@ public class GameEngine {
     }
 
     public void update(long now) {
-
         if (!running) return;
 
         long gameTime = now - startTime;
 
-        // 1. Actualizar dificultad según tiempo
         difficulty.update(gameTime);
+        hpSystem.update(now);
 
-        // 2. Lógica de notas
+        if (hpSystem.isDead()) {
+            running = false;
+            return;
+        }
+
         activateNotes(gameTime);
         spawnNote(gameTime);
         checkExpiredNotes(gameTime);
@@ -57,55 +63,42 @@ public class GameEngine {
     }
 
     private void spawnNote(long gameTime) {
-
         if (gameTime - lastSpawnTime >= difficulty.getSpawnInterval()) {
-
             double x = 100 + Math.random() * 600;
             double y = 100 + Math.random() * 300;
-            boolean trap = Math.random() < 0.10;  // 20% de chances de trampa
+            boolean trap = Math.random() < 0.20;
 
             Note note = new Note(x, y, gameTime, difficulty.getNoteDuration(), trap);
             note.setState(NoteState.ACTIVE);
             activeNotes.add(note);
-
             lastSpawnTime = gameTime;
         }
     }
 
     private void checkExpiredNotes(long gameTime) {
-
         if (activeNotes.isEmpty()) return;
 
         Note current = activeNotes.peek();
-
         if (current.isExpired(gameTime)) {
             current.setState(NoteState.MISSED);
             activeNotes.poll();
 
             if (!current.isTrap()) {
-                // Solo penalizar si era una nota normal, no una trampa
                 scoreSystem.registerMiss();
-                running = false;
+                hpSystem.registerMiss();
+                // Ya no cortamos running aquí — el HP drain se encarga
             }
         }
     }
 
     // ------------------------------------------------------------------ //
 
-    public boolean checkHit(double x, double y, long now) {
-        return checkHitWithDistance(x, y, now) != null;
-    }
-
-    /** Devuelve la distancia al centro de la nota golpeada, o null si no hubo hit */
     public HitResult checkHitWithDistance(double x, double y, long now) {
-
         if (!running) return null;
 
         Iterator<Note> iterator = activeNotes.iterator();
-
         while (iterator.hasNext()) {
             Note note = iterator.next();
-
             if (note.getState() == NoteState.ACTIVE && note.isInside(x, y, 30)) {
                 double dx = x - note.getX();
                 double dy = y - note.getY();
@@ -116,21 +109,19 @@ public class GameEngine {
                 return new HitResult(distance, note.isTrap());
             }
         }
-
         return null;
     }
 
-    /** Resultado de un hit con la distancia al centro y si era trampa */
     public record HitResult(double distance, boolean trap) {}
 
     // ------------------------------------------------------------------ //
 
-    public List<Note> getActiveNotes()   { return new ArrayList<>(activeNotes); }
-    public ScoreSystem getScoreSystem()  { return scoreSystem; }
+    public List<Note> getActiveNotes()       { return new ArrayList<>(activeNotes); }
+    public ScoreSystem getScoreSystem()      { return scoreSystem; }
+    public HpSystem getHpSystem()            { return hpSystem; }
     public DifficultyManager getDifficulty() { return difficulty; }
-    public boolean isRunning()           { return running; }
-    public boolean isGameOver()          { return !running; }
-
-    /** Fuerza el fin del juego inmediatamente (usado al clickear una trampa) */
-    public void forceGameOver()          { running = false; }
+    public boolean isRunning()               { return running; }
+    public boolean isGameOver()              { return !running; }
+    public void forceGameOver()              { running = false; }
+    public long getGameTime(long now)        { return now - startTime; }
 }

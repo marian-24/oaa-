@@ -50,7 +50,7 @@ public class MainFrame {
         GameController controller = new GameController(
                 canvasState,
                 gameView,
-                score -> showGameOver(score, GameMode.ARCADE)
+                (score, scoreSystem) -> showGameOver(score, GameMode.ARCADE, scoreSystem)
         );
 
         stage.setScene(new Scene(gameView, 800, 600));
@@ -101,7 +101,7 @@ public class MainFrame {
                     SongController controller = new SongController(
                             engine,
                             gameView,
-                            score -> showSongGameOver(score, audioFile)
+                            (score, scoreSystem) -> showSongGameOver(score, audioFile, scoreSystem)
                     );
 
                     stage.setScene(new Scene(gameView, 800, 600));
@@ -119,28 +119,29 @@ public class MainFrame {
     //  Game Over (ambos modos)
     // ------------------------------------------------------------------ //
 
-    public void showGameOver(int finalScore, GameMode mode) {
+    public void showGameOver(int finalScore, GameMode mode, Model.ScoreSystem scoreSystem) {
         highScoreManager.submitScore(finalScore, mode);
 
         GameOverView gameOverView = new GameOverView(
                 finalScore,
                 highScoreManager.getHighScore(mode),
-                mode
+                mode,
+                scoreSystem
         );
 
         gameOverView.getRetryButton().setOnAction(e -> showMenu());
         stage.setScene(new Scene(gameOverView, 800, 600));
     }
 
-    /** Game over específico para una canción: guarda el score por canción Y el global de song mode */
-    public void showSongGameOver(int finalScore, File audioFile) {
+    public void showSongGameOver(int finalScore, File audioFile, Model.ScoreSystem scoreSystem) {
         highScoreManager.submitSongScore(finalScore, audioFile.getName());
         highScoreManager.submitScore(finalScore, GameMode.SONG);
 
         GameOverView gameOverView = new GameOverView(
                 finalScore,
                 highScoreManager.getSongHighScore(audioFile.getName()),
-                GameMode.SONG
+                GameMode.SONG,
+                scoreSystem
         );
 
         gameOverView.getRetryButton().setOnAction(e -> showMenu());

@@ -129,18 +129,26 @@ public class GameView extends Pane {
         this.clickHandler = handler;
     }
 
-    /** Actualiza las vidas mostradas en el HUD. Llamar con -1 para ocultarlas (modo arcade). */
-    public void setLives(int lives) {
-        this.lives = lives;
-    }
+    // --- HP y tiempo para approach circle ---
+    private double currentHp  = 1.0;
+    private long   currentGameTime = 0;
 
-    public void renderFrame(List<Note> activeNotes) {
+    public void setLives(int lives) { /* reemplazado por HP drain */ }
+
+    public void renderFrame(List<Note> activeNotes, double hp, long gameTime) {
+        this.currentHp       = hp;
+        this.currentGameTime = gameTime;
         drawBackground();
         drawStars();
         updateAndDrawParticles();
         drawNotes(activeNotes);
         updateAndDrawFeedbackLabels();
         drawHUD();
+    }
+
+    /** Retrocompatibilidad */
+    public void renderFrame(List<Note> activeNotes) {
+        renderFrame(activeNotes, currentHp, currentGameTime);
     }
 
     public void renderNotes(List<Note> activeNotes) {
@@ -230,12 +238,14 @@ public class GameView extends Pane {
 
     private void drawNotes(List<Note> notes) {
         for (Note note : notes) {
-            if (note.isTrap()) drawTrapNote(note.getX(), note.getY());
-            else               drawNote(note.getX(), note.getY());
+            double progress = (double)(currentGameTime - note.getAppearTime()) / note.getDuration();
+            progress = Math.max(0, Math.min(1, progress));
+            if (note.isTrap()) drawTrapNote(note.getX(), note.getY(), progress);
+            else               drawNote(note.getX(), note.getY(), progress);
         }
     }
 
-    private void drawNote(double x, double y) {
+    private void drawNote(double x, double y, double progress) {
         boolean isMatrix = theme == MenuTheme.MATRIX;
 
         String haloColor  = isMatrix ? "#00FF41" : "#7B2FFF";
@@ -243,6 +253,15 @@ public class GameView extends Pane {
         String fillEnd    = isMatrix ? "#003311" : "#4B0082";
         String borderColor= isMatrix ? "#00FF41" : "#A78BFA";
         String centerColor= isMatrix ? "#AAFFAA" : "#E0E7FF";
+        String approachColor = isMatrix ? "#00FF41" : "#FFFFFF";
+
+        // --- Approach circle ---
+        // Empieza en 3x el radio y se achica hasta 1x cuando progress=1
+        double approachScale = 3.0 - 2.0 * progress;
+        double ar = NOTE_RADIUS * approachScale;
+        gc.setStroke(Color.web(approachColor, 0.85 * (1.0 - progress * 0.5)));
+        gc.setLineWidth(2.0);
+        gc.strokeOval(x - ar, y - ar, ar * 2, ar * 2);
 
         // Halo exterior
         RadialGradient halo = new RadialGradient(
@@ -303,30 +322,44 @@ public class GameView extends Pane {
     }
 
     private void drawHUD() {
-        // Score — grande, arriba a la derecha (estilo osu!)
+        // --- Barra de HP (abajo del todo, ancho completo) ---
+        double barW  = WIDTH;
+        double barH  = 8;
+        double barY  = HEIGHT - barH;
+        double fillW = barW * Math.max(0, currentHp);
+
+        // Fondo gris
+        gc.setFill(Color.web("#222222"));
+        gc.fillRect(0, barY, barW, barH);
+
+        // Color de la barra según nivel de HP
+        String hpColor;
+        if (currentHp > 0.5)      hpColor = "#FF66AA";   // rosa saludable
+        else if (currentHp > 0.25) hpColor = "#FF9900";  // naranja de alerta
+        else                       hpColor = "#FF2222";   // rojo crítico
+
+        gc.setFill(Color.web(hpColor));
+        gc.fillRect(0, barY, fillW, barH);
+
+        // Borde sutil
+        gc.setStroke(Color.web("#444444"));
+        gc.setLineWidth(1);
+        gc.strokeRect(0, barY, barW, barH);
+
+        // --- Score arriba a la derecha ---
         gc.setFont(Font.font("Arial", FontWeight.BOLD, 36));
         gc.setFill(Color.web("#FFFFFF"));
         gc.setTextAlign(TextAlignment.RIGHT);
         gc.fillText(scoreText, WIDTH - 16, 46);
 
-        // High score — más chico, debajo del score
+        // High score debajo
         gc.setFont(Font.font("Arial", FontWeight.NORMAL, 16));
         gc.setFill(Color.web("#FFD700", 0.85));
         gc.fillText(highScoreText, WIDTH - 16, 68);
 
         gc.setTextAlign(TextAlignment.LEFT);
 
-        // Vidas — corazones arriba a la izquierda (solo en modo canción)
-        if (lives >= 0) {
-            gc.setFont(Font.font("Arial", FontWeight.BOLD, 26));
-            StringBuilder hearts = new StringBuilder();
-            for (int i = 0; i < lives; i++) {
-                hearts.append("❤ ");
-            }
-            gc.fillText(hearts.toString().trim(), 16, 36);
-        }
-
-        // Combo — abajo a la izquierda (estilo osu!)
+        // --- Combo abajo a la izquierda ---
         if (!comboText.isEmpty()) {
             gc.setFont(Font.font("Arial", FontWeight.BOLD, 32));
             gc.setFill(Color.web("#FFFFFF"));
@@ -353,8 +386,15 @@ public class GameView extends Pane {
         }
     }
 
-    private void drawTrapNote(double x, double y) {
+    private void drawTrapNote(double x, double y, double progress) {
         double r = NOTE_RADIUS;
+
+        // --- Approach circle rojo ---
+        double approachScale = 3.0 - 2.0 * progress;
+        double ar = r * approachScale;
+        gc.setStroke(Color.web("#FF4444", 0.85 * (1.0 - progress * 0.5)));
+        gc.setLineWidth(2.0);
+        gc.strokeOval(x - ar, y - ar, ar * 2, ar * 2);
 
         // Halo rojo exterior
         RadialGradient halo = new RadialGradient(
@@ -365,11 +405,10 @@ public class GameView extends Pane {
         double hs = r * 1.8 * 2;
         gc.fillOval(x - r * 1.8, y - r * 1.8, hs, hs);
 
-        // Rombo: 4 puntos (arriba, derecha, abajo, izquierda)
+        // Rombo
         double[] px = { x,     x + r, x,     x - r };
         double[] py = { y - r, y,     y + r, y     };
 
-        // Relleno degradado rojo
         RadialGradient fill = new RadialGradient(
                 0, 0, x, y - r * 0.3, r,
                 false, CycleMethod.NO_CYCLE,
@@ -378,12 +417,10 @@ public class GameView extends Pane {
         gc.setFill(fill);
         gc.fillPolygon(px, py, 4);
 
-        // Borde rojo brillante
         gc.setStroke(Color.web("#FF2222"));
         gc.setLineWidth(2.5);
         gc.strokePolygon(px, py, 4);
 
-        // Punto central blanco
         gc.setFill(Color.web("#FFAAAA", 0.9));
         gc.fillOval(x - 3, y - 3, 6, 6);
     }
