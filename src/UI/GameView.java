@@ -325,13 +325,14 @@ public class GameView extends Pane {
 
     private void drawNote(double x, double y, double progress) {
         boolean isMatrix = theme == MenuTheme.MATRIX;
+        boolean isSakura = theme == MenuTheme.SAKURA;
 
-        String haloColor  = isMatrix ? "#00FF41" : "#7B2FFF";
-        String fillStart  = isMatrix ? "#00CC33" : "#00BFFF";
-        String fillEnd    = isMatrix ? "#003311" : "#4B0082";
-        String borderColor= isMatrix ? "#00FF41" : "#A78BFA";
-        String centerColor= isMatrix ? "#AAFFAA" : "#E0E7FF";
-        String approachColor = isMatrix ? "#00FF41" : "#FFFFFF";
+        String haloColor   = isMatrix ? "#00FF41" : isSakura ? "#FF85A1" : "#7B2FFF";
+        String fillStart   = isMatrix ? "#00CC33" : isSakura ? "#FFB7C5" : "#00BFFF";
+        String fillEnd     = isMatrix ? "#003311" : isSakura ? "#6B002A" : "#4B0082";
+        String borderColor = isMatrix ? "#00FF41" : isSakura ? "#FF85A1" : "#A78BFA";
+        String centerColor = isMatrix ? "#AAFFAA" : isSakura ? "#FFD6E0" : "#E0E7FF";
+        String approachColor = isMatrix ? "#00FF41" : isSakura ? "#FFB7C5" : "#FFFFFF";
 
         // --- Approach circle ---
         // Empieza en 3x el radio y se achica hasta 1x cuando progress=1
