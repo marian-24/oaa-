@@ -52,7 +52,10 @@ public class SongController {
         gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
+                double hpBefore = engine.getHpSystem().getHp();
                 engine.update(now);
+                double hpAfter  = engine.getHpSystem().getHp();
+                if (hpAfter < hpBefore) view.triggerDamageFlash();
                 view.renderFrame(engine.getActiveNotes(), engine.getHpSystem().getHp(), engine.getGameTime(now));
                 view.updateScore(engine.getScoreSystem());
 

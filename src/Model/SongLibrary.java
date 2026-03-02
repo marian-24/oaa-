@@ -7,88 +7,81 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Administra la librería de canciones locales.
- *
- * Lee todos los archivos WAV/MP3/AIFF de la carpeta songs/
- * (relativa al directorio de ejecución del juego).
- * Si la carpeta no existe, la crea automáticamente.
- */
 public class SongLibrary {
 
     private static final String SONGS_FOLDER = "C:/Users/maria/OneDrive/Escritorio/songs";
-    private static final String[] SUPPORTED = {".wav", ".mp3", ".aiff"};
+    private static final String MAPS_FOLDER  = "C:/Users/maria/OneDrive/Escritorio/songs/maps";
+
+    private static final String[] AUDIO_EXTS = {".wav", ".mp3", ".aiff"};
 
     // ------------------------------------------------------------------ //
+    //  Canciones de audio (para Song Mode — beat detection automático)
+    // ------------------------------------------------------------------ //
 
-    /**
-     * Escanea la carpeta songs/ y devuelve todas las canciones encontradas.
-     * Cada entrada incluye nombre y duración calculada.
-     */
     public static List<SongEntry> loadAll() {
         List<SongEntry> entries = new ArrayList<>();
-
-        File folder = getSongsFolder();
-        File[] files = folder.listFiles(SongLibrary::isAudioFile);
-
+        File[] files = getSongsFolder().listFiles(SongLibrary::isAudioFile);
         if (files == null) return entries;
-
-        for (File file : files) {
-            long duration = getDurationSeconds(file);
-            String name = SongEntry.cleanName(file);
-            entries.add(new SongEntry(file, name, duration));
+        for (File f : files) {
+            entries.add(new SongEntry(f, SongEntry.cleanName(f), getDurationSeconds(f)));
         }
-
-        // Ordenar alfabéticamente por nombre
         entries.sort((a, b) -> a.displayName().compareToIgnoreCase(b.displayName()));
-
         return entries;
     }
 
-    /** Devuelve (y crea si no existe) la carpeta songs/ */
-    public static File getSongsFolder() {
-        File folder = new File(SONGS_FOLDER);
-        if (!folder.exists()) {
-            folder.mkdirs();
-        }
-        return folder;
-    }
+    // ------------------------------------------------------------------ //
+    //  Mapas manuales (para Map Editor — archivos .rhythmmap)
+    // ------------------------------------------------------------------ //
 
-    public static String getSongsFolderPath() {
-        return getSongsFolder().getAbsolutePath();
+    public static List<SongEntry> loadMaps() {
+        List<SongEntry> entries = new ArrayList<>();
+        File[] files = getMapsFolder().listFiles(
+                f -> f.isFile() && f.getName().toLowerCase().endsWith(".rhythmmap"));
+        if (files == null) return entries;
+        for (File f : files) {
+            entries.add(new SongEntry(f, SongEntry.cleanName(f), 0));
+        }
+        entries.sort((a, b) -> a.displayName().compareToIgnoreCase(b.displayName()));
+        return entries;
     }
 
     // ------------------------------------------------------------------ //
-    //  Privados
+    //  Carpetas
+    // ------------------------------------------------------------------ //
+
+    public static File getSongsFolder() {
+        File f = new File(SONGS_FOLDER);
+        if (!f.exists()) f.mkdirs();
+        return f;
+    }
+
+    public static File getMapsFolder() {
+        File f = new File(MAPS_FOLDER);
+        if (!f.exists()) f.mkdirs();
+        return f;
+    }
+
+    public static String getSongsFolderPath() { return getSongsFolder().getAbsolutePath(); }
+    public static String getMapsFolderPath()  { return getMapsFolder().getAbsolutePath(); }
+
     // ------------------------------------------------------------------ //
 
     private static boolean isAudioFile(File file) {
         if (!file.isFile()) return false;
         String lower = file.getName().toLowerCase();
-        for (String ext : SUPPORTED) {
-            if (lower.endsWith(ext)) return true;
-        }
+        for (String ext : AUDIO_EXTS) if (lower.endsWith(ext)) return true;
         return false;
     }
 
-    /**
-     * Calcula la duración en segundos del archivo de audio.
-     * Usa AudioSystem para WAV/AIFF. Para MP3 sin librería extra
-     * devuelve 0 si no puede leerlo.
-     */
     private static long getDurationSeconds(File file) {
         try {
-            AudioInputStream stream = AudioSystem.getAudioInputStream(file);
-            AudioFormat format = stream.getFormat();
-            long frames = stream.getFrameLength();
-            stream.close();
-
-            if (frames > 0 && format.getFrameRate() > 0) {
-                return (long) (frames / format.getFrameRate());
-            }
-        } catch (Exception ignored) {
-            // MP3 sin librería o archivo corrupto → duración desconocida
-        }
+            AudioInputStream s = AudioSystem.getAudioInputStream(file);
+            AudioFormat fmt = s.getFormat();
+            long frames = s.getFrameLength();
+            s.close();
+            if (frames > 0 && fmt.getFrameRate() > 0)
+                return (long)(frames / fmt.getFrameRate());
+        } catch (Exception ignored) {}
         return 0;
     }
 }

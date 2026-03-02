@@ -61,9 +61,10 @@ public class GameController {
                 engine.update(now);
                 List<Note> after = engine.getActiveNotes();
 
-                if (before.size() > after.size() && engine.isGameOver()) {
+                if (before.size() > after.size()) {
                     Note missed = before.get(0);
                     view.spawnMissEffect(missed.getX(), missed.getY());
+                    view.triggerDamageFlash();
                 }
 
                 view.renderFrame(engine.getActiveNotes(), engine.getHpSystem().getHp(), engine.getGameTime(now));

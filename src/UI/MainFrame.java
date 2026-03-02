@@ -1,10 +1,14 @@
 package UI;
 
 import Controller.GameController;
+import Controller.MapEditorController;
 import Controller.SongController;
 import Game.BeatDetector;
 import Game.SongEngine;
 import Model.GameMode;
+import Model.RhythmMapWriter;
+import Model.SongEntry;
+import Model.SongLibrary;
 import Model.HighScoreManager;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -80,10 +84,21 @@ public class MainFrame {
     //  Modo Canción — juego
     // ------------------------------------------------------------------ //
 
-    public void startSongGame(File audioFile) {
+    public void startSongGame(File file) {
         new Thread(() -> {
             try {
-                List<Long> beats = BeatDetector.detect(audioFile);
+                // Si es un .rhythmmap, leer beats del archivo; si no, detectarlos
+                final List<Long> beats;
+                final File audioFile;
+
+                if (file.getName().endsWith(".rhythmmap")) {
+                    RhythmMapWriter.LoadedMap loaded = RhythmMapWriter.read(file);
+                    beats     = loaded.beatsNs();
+                    audioFile = loaded.audioFile();
+                } else {
+                    beats     = BeatDetector.detect(file);
+                    audioFile = file;
+                }
 
                 Platform.runLater(() -> {
                     if (beats.isEmpty()) {
@@ -110,7 +125,7 @@ public class MainFrame {
 
             } catch (Exception ex) {
                 Platform.runLater(() ->
-                        showError("Error loading audio", ex.getMessage()));
+                        showError("Error loading", ex.getMessage()));
             }
         }).start();
     }
@@ -146,6 +161,71 @@ public class MainFrame {
 
         gameOverView.getRetryButton().setOnAction(e -> showMenu());
         stage.setScene(new Scene(gameOverView, 800, 600));
+    }
+
+    // ------------------------------------------------------------------ //
+    //  Editor de mapas — selección de audio
+    // ------------------------------------------------------------------ //
+
+    public void showMapEditorSelect() {
+        MapSelectView mapSelect = new MapSelectView();
+
+        // Jugar un mapa existente
+        mapSelect.setOnMapSelected(this::startSongGame);
+
+        // Crear un mapa nuevo → elegir audio con SongSelectView
+        mapSelect.getNewMapButton().setOnAction(e -> showAudioSelectForEditor());
+
+        mapSelect.getBackButton().setOnAction(e -> showMenu());
+        stage.setScene(new javafx.scene.Scene(mapSelect, 800, 600));
+    }
+
+    /** Selector de audio para crear un mapa nuevo */
+    public void showAudioSelectForEditor() {
+        SongSelectView selectView = new SongSelectView(highScoreManager);
+        selectView.setOnSongSelected(this::startMapEditor);
+        selectView.getUploadButton().setOnAction(e -> selectView.openFileChooser(stage));
+        selectView.getBackButton().setOnAction(e -> showMapEditorSelect());
+        stage.setScene(new javafx.scene.Scene(selectView, 800, 600));
+    }
+
+    public void startMapEditor(File audioFile) {
+        String songName = SongEntry.cleanName(audioFile);
+        // Necesitamos la duración — intentamos leerla
+        long durationMs = 0;
+        try {
+            javax.sound.sampled.AudioInputStream s =
+                    javax.sound.sampled.AudioSystem.getAudioInputStream(audioFile);
+            javax.sound.sampled.AudioFormat fmt = s.getFormat();
+            long frames = s.getFrameLength();
+            s.close();
+            if (frames > 0 && fmt.getFrameRate() > 0)
+                durationMs = (long)(frames / fmt.getFrameRate() * 1000);
+        } catch (Exception ignored) {}
+
+        MapEditorView editorView = new MapEditorView(songName, durationMs);
+        stage.setScene(new javafx.scene.Scene(editorView, 800, 600));
+
+        MapEditorController controller = new MapEditorController(
+                audioFile,
+                editorView,
+                mapFile -> showMapSaved(mapFile),   // onSaved
+                this::showMenu                       // onCancel
+        );
+        controller.start();
+    }
+
+    private void showMapSaved(File mapFile) {
+        javafx.application.Platform.runLater(() -> {
+            javafx.scene.control.Alert alert =
+                    new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("Map saved!");
+            alert.setHeaderText(null);
+            alert.setContentText("Map saved to:\n" + mapFile.getAbsolutePath() +
+                    "\n\nIt will appear in Song Select next time you open it.");
+            alert.showAndWait();
+            showMapEditorSelect();
+        });
     }
 
     // ------------------------------------------------------------------ //

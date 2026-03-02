@@ -133,7 +133,34 @@ public class GameView extends Pane {
     private double currentHp  = 1.0;
     private long   currentGameTime = 0;
 
+    // --- Flash de combo milestone ---
+    private double comboFlashAlpha = 0;    // 0 = sin flash, >0 = mostrando
+    private String comboFlashText  = "";
+    private String comboFlashColor = "#FFFFFF";
+
+    // --- Flash de daño (pantalla roja) ---
+    private double damageFlashAlpha = 0;
+
     public void setLives(int lives) { /* reemplazado por HP drain */ }
+
+    /** Dispara el efecto visual de milestone de combo */
+    public void triggerComboMilestone(int milestone) {
+        comboFlashText  = milestone + "x COMBO!";
+        comboFlashAlpha = 1.0;
+        comboFlashColor = switch (milestone) {
+            case 10  -> "#FFD700";
+            case 25  -> "#FF6600";
+            case 50  -> "#FF00FF";
+            default  -> "#FF0000";
+        };
+        spawnMilestoneParticles(milestone);
+        playMilestoneSound(milestone);
+    }
+
+    /** Dispara el flash rojo de daño */
+    public void triggerDamageFlash() {
+        damageFlashAlpha = 0.35;
+    }
 
     public void renderFrame(List<Note> activeNotes, double hp, long gameTime) {
         this.currentHp       = hp;
@@ -144,6 +171,8 @@ public class GameView extends Pane {
         drawNotes(activeNotes);
         updateAndDrawFeedbackLabels();
         drawHUD();
+        drawDamageFlash();
+        drawComboFlash();
     }
 
     /** Retrocompatibilidad */
@@ -322,6 +351,53 @@ public class GameView extends Pane {
         }
         gc.setGlobalAlpha(1.0);
         gc.setTextAlign(TextAlignment.LEFT); // resetear para el HUD
+    }
+
+    private void drawDamageFlash() {
+        if (damageFlashAlpha <= 0) return;
+        gc.setFill(Color.web("#FF0000", damageFlashAlpha));
+        gc.fillRect(0, 0, WIDTH, HEIGHT);
+        damageFlashAlpha = Math.max(0, damageFlashAlpha - 0.025);
+    }
+
+    private void drawComboFlash() {
+        if (comboFlashAlpha <= 0) return;
+        gc.setGlobalAlpha(comboFlashAlpha);
+        double size = 48 + (1.0 - comboFlashAlpha) * 20; // crece al aparecer
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, size));
+        gc.setFill(Color.web(comboFlashColor));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.fillText(comboFlashText, WIDTH / 2, HEIGHT / 2 - 30);
+        gc.setGlobalAlpha(1.0);
+        gc.setTextAlign(TextAlignment.LEFT);
+        comboFlashAlpha = Math.max(0, comboFlashAlpha - 0.018);
+    }
+
+    private void spawnMilestoneParticles(int milestone) {
+        Random rand = new Random();
+        int count = milestone >= 50 ? 60 : (milestone >= 25 ? 40 : 25);
+        String[] colors = milestone >= 50
+                ? new String[]{"#FF00FF", "#FF66FF", "#FFFFFF", "#FFD700"}
+                : milestone >= 25
+                ? new String[]{"#FF6600", "#FFB347", "#FFFFFF"}
+                : new String[]{"#FFD700", "#FFFACD", "#FFFFFF"};
+        for (int i = 0; i < count; i++) {
+            double angle = rand.nextDouble() * Math.PI * 2;
+            double speed = 2.0 + rand.nextDouble() * 6.0;
+            double life  = 0.7 + rand.nextDouble() * 0.5;
+            Color c = Color.web(colors[rand.nextInt(colors.length)]);
+            particles.add(new Particle(
+                    WIDTH / 2, HEIGHT / 2,
+                    Math.cos(angle) * speed, Math.sin(angle) * speed,
+                    life, c));
+        }
+    }
+
+    private void playMilestoneSound(int milestone) {
+        float freq = milestone >= 50 ? 1400f : (milestone >= 25 ? 1100f : 880f);
+        // Acorde de dos tonos para más impacto
+        playTone(freq,        200, 0.35f);
+        playTone(freq * 1.25f, 200, 0.25f);
     }
 
     private void drawHUD() {

@@ -29,6 +29,7 @@ public class MenuView extends StackPane {
 
     private Button startButton;
     private Button songButton;
+    private Button editorButton;
     private AnimationTimer animator;
     private MenuTheme currentTheme;
 
@@ -106,11 +107,15 @@ public class MenuView extends StackPane {
         songButton.setFont(Font.font("Arial", FontWeight.BOLD, 22));
         applyButtonStyle(songButton, "#6A1B9A", "#8E24AA", "#CE93D8");
 
+        editorButton = new Button("✏  MAP EDITOR");
+        editorButton.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+        applyButtonStyle(editorButton, "#1B5E20", "#2E7D32", "#81C784");
+
         // Selector de tema
         HBox themeRow = buildThemeSelector();
 
         content.getChildren().addAll(title, subtitle, highScoreLabel,
-                startButton, songButton, themeRow);
+                startButton, songButton, editorButton, themeRow);
         getChildren().addAll(canvas, content);
     }
 
@@ -321,11 +326,11 @@ public class MenuView extends StackPane {
         btn.setOnMouseExited(e  -> btn.setStyle(baseStyle));
     }
 
-
     public void stopAnimation() {
         if (animator != null) animator.stop();
     }
 
-    public Button getStartButton() { return startButton; }
-    public Button getSongButton()  { return songButton; }
+    public Button getStartButton()  { return startButton; }
+    public Button getSongButton()   { return songButton; }
+    public Button getEditorButton() { return editorButton; }
 }

@@ -13,5 +13,10 @@ public class MenuController {
             view.stopAnimation();
             frame.showSongSelect();
         });
+
+        view.getEditorButton().setOnAction(e -> {
+            view.stopAnimation();
+            frame.showMapEditorSelect();
+        });
     }
 }
